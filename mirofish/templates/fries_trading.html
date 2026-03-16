@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>薯条交易 | Fries Trading</title>
+  <script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
+  <script src="https://unpkg.com/force-graph@1.43.5/dist/force-graph.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/renderers/CSS2DRenderer.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0a1a;
+      --bg-secondary: #12122a;
+      --bg-card: #1a1a3e;
+      --accent: #ffd700;
+      --accent2: #ff6b35;
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888aa;
+      --border: #2a2a4e;
+      --stock-color: #53c1de;
+      --persona-color: #e94560;
+      --tag-color: #f39c12;
+      --group-color: #9b59b6;
+      --sector-color: #2ecc71;
+      --strategy-color: #e67e22;
+      --market-color: #1abc9c;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* ====== Top Nav ====== */
+    .top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: linear-gradient(135deg, var(--bg-secondary) 0%, #1a0a2e 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo .icon {
+      font-size: 28px;
+      -webkit-text-fill-color: initial;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      margin-left: 40px;
+    }
+
+    .nav-tab {
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .nav-tab.active {
+      color: var(--accent);
+      background: rgba(255, 215, 0, 0.08);
+      border-color: rgba(255, 215, 0, 0.2);
+    }
+
+    .nav-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .search-box {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 14px;
+      color: var(--text-primary);
+      font-size: 13px;
+      width: 200px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box:focus {
+      border-color: var(--accent);
+    }
+
+    /* ====== Main Layout ====== */
+    .main-container {
+      display: flex;
+      height: calc(100vh - 56px);
+      margin-top: 56px;
+    }
+
+    /* ====== Sidebar ====== */
+    .sidebar {
+      width: 300px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width 0.3s;
+    }
+
+    .sidebar.collapsed {
+      width: 48px;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h3 {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .sidebar-section {
+      margin-bottom: 16px;
+    }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+
+    /* ====== Graph Container ====== */
+    .graph-container {
+      flex: 1;
+      position: relative;
+      background: var(--bg-primary);
+    }
+
+    #graph-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ====== Controls ====== */
+    .graph-controls {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      background: rgba(18, 18, 42, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 16px;
+      backdrop-filter: blur(12px);
+    }
+
+    .ctrl-btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .ctrl-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--accent);
+    }
+
+    .ctrl-btn.active {
+      background: rgba(255, 215, 0, 0.15);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* ====== Node Detail Panel ====== */
+    .detail-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 320px;
+      background: rgba(26, 26, 62, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      backdrop-filter: blur(16px);
+      display: none;
+      overflow: hidden;
+    }
+
+    .detail-panel.visible {
+      display: block;
+    }
+
+    .detail-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .detail-header h3 {
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .detail-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .detail-body {
+      padding: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .detail-row .label {
+      color: var(--text-secondary);
+    }
+
+    /* ====== Stats Bar ====== */
+    .stats-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .stat-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      background: rgba(26, 26, 62, 0.8);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+
+    .stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ====== Cards ====== */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 13px;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateX(2px);
+    }
+
+    .card .card-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .card .card-desc {
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .card .card-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      margin-right: 4px;
+    }
+
+    /* ====== Input Modal ====== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 520px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .modal-body {
+      padding: 20px 24px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-input {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(255, 215, 0, 0.03);
+    }
+
+    .drop-zone img {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 8px;
+      margin-top: 12px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.08);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    /* ====== Toast ====== */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 300;
+      display: none;
+      backdrop-filter: blur(8px);
+    }
+
+    .toast.success {
+      background: rgba(46, 204, 113, 0.9);
+      color: #fff;
+    }
+
+    .toast.error {
+      background: rgba(233, 69, 96, 0.9);
+      color: #fff;
+    }
+
+    .toast.visible {
+      display: block;
+    }
+
+    /* ====== Scrollbar ====== */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    /* ====== Tag Chips ====== */
+    .tag-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .tag-chip {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      background: rgba(243, 156, 18, 0.15);
+      color: var(--tag-color);
+      border: 1px solid rgba(243, 156, 18, 0.3);
+    }
+
+    /* ====== Legend ====== */
+    .legend {
+      position: absolute;
+      bottom: 80px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="top-nav">
+    <div class="logo">
+      <span class="icon">🍟</span>
+      <span>薯条交易</span>
+    </div>
+    <div class="nav-tabs">
+      <div class="nav-tab active" data-view="stocks-2d">标的图谱</div>
+      <div class="nav-tab" data-view="personas-2d">Persona图谱</div>
+      <div class="nav-tab" data-view="cross-3d">3D空间</div>
+    </div>
+    <div class="nav-right">
+      <input class="search-box" id="search-input" placeholder="搜索标的/Persona...">
+      <button class="btn btn-primary" onclick="openAddModal()">+ 添加</button>
+    </div>
+  </nav>
+
+  <!-- Main Layout -->
+  <div class="main-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>图谱导航</h3>
+      </div>
+      <div class="sidebar-content">
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">标的群组</div>
+          <div id="groups-list"></div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">标签</div>
+          <div id="tags-list"></div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Personas</div>
+          <div id="personas-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Graph -->
+    <div class="graph-container">
+      <div id="graph-canvas"></div>
+
+      <!-- Stats -->
+      <div class="stats-bar" id="stats-bar"></div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--stock-color)"></div>Stock</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--persona-color)"></div>Persona</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--tag-color)"></div>Tag</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--group-color)"></div>Group</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--sector-color)"></div>Sector</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--strategy-color)"></div>Strategy</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--market-color)"></div>Market</div>
+      </div>
+
+      <!-- Controls -->
+      <div class="graph-controls">
+        <button class="ctrl-btn" onclick="zoomToFit()">Fit</button>
+        <button class="ctrl-btn" onclick="toggleLabels()">Labels</button>
+        <button class="ctrl-btn" onclick="refreshGraph()">Refresh</button>
+        <button class="ctrl-btn" onclick="openImageModal()">📸 Image</button>
+        <button class="ctrl-btn" onclick="openAddModal()">➕ Add</button>
+      </div>
+
+      <!-- Node Detail -->
+      <div class="detail-panel" id="detail-panel">
+        <div class="detail-header">
+          <h3 id="detail-title"></h3>
+          <button class="detail-close" onclick="closeDetail()">×</button>
+        </div>
+        <div class="detail-body" id="detail-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Modal -->
+  <div class="modal-overlay" id="add-modal">
+    <div class="modal">
+      <div class="modal-header">添加节点</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>类型</label>
+          <select class="form-input" id="add-type">
+            <option value="stock">Stock 标的</option>
+            <option value="group">Group 群组</option>
+            <option value="tag">Tag 标签</option>
+            <option value="persona">Persona 人格</option>
+          </select>
+        </div>
+        <div id="add-fields"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('add-modal')">取消</button>
+        <button class="btn btn-primary" onclick="submitAdd()">确认添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Modal -->
+  <div class="modal-overlay" id="image-modal">
+    <div class="modal">
+      <div class="modal-header">📸 多模态输入识别</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>截图 / 图片上传</label>
+          <div class="drop-zone" id="img-drop-zone">
+            <p>拖拽图片到此处，或点击选择文件</p>
+            <p style="font-size:12px;color:var(--text-secondary)">支持 JPG, PNG, WebP（最大 5MB）<br>也支持 Ctrl+V 粘贴</p>
+            <input type="file" id="img-file-input" accept="image/*" style="display:none">
+            <img id="img-preview" style="display:none">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>或粘贴文本</label>
+          <textarea class="form-input" id="img-text-input" rows="3"
+            placeholder="粘贴股票列表文本 (如 AAPL, TSLA, MSFT, NVDA)"></textarea>
+        </div>
+        <div id="img-results" style="display:none">
+          <label style="font-size:12px;color:var(--text-secondary);text-transform:uppercase">识别结果</label>
+          <div id="img-results-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('image-modal')">取消</button>
+        <button class="btn btn-secondary" onclick="extractFromImage()">识别图片</button>
+        <button class="btn btn-secondary" onclick="parseText()">解析文本</button>
+        <button class="btn btn-primary" onclick="addRecognizedStocks()">添加到图谱</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ========================================
+    // Config & State
+    // ========================================
+    const API_BASE = window.location.origin;
+    let currentView = 'stocks-2d';
+    let graphInstance = null;
+    let showLabels = true;
+    let selectedFile = null;
+    let recognizedStocks = [];
+
+    // ========================================
+    // API Helper
+    // ========================================
+    async function api(method, path, body) {
+      const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+      };
+      if (body) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + path, opts);
+      return resp.json();
+    }
+
+    async function apiUpload(path, file) {
+      const form = new FormData();
+      form.append('file', file);
+      const resp = await fetch(API_BASE + path, { method: 'POST', body: form });
+      return resp.json();
+    }
+
+    // ========================================
+    // Toast
+    // ========================================
+    function showToast(msg, type = 'success') {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast visible ' + type;
+      setTimeout(() => el.classList.remove('visible'), 3000);
+    }
+
+    // ========================================
+    // Graph Rendering
+    // ========================================
+    async function loadGraph(view) {
+      currentView = view;
+      const container = document.getElementById('graph-canvas');
+      container.innerHTML = '';
+
+      // Destroy existing graph
+      if (graphInstance) {
+        if (graphInstance._destructor) graphInstance._destructor();
+        graphInstance = null;
+      }
+
+      let endpoint;
+      let is3D = false;
+      switch (view) {
+        case 'stocks-2d':
+          endpoint = '/api/v1/mirofish/graph/stocks';
+          break;
+        case 'personas-2d':
+          endpoint = '/api/v1/mirofish/graph/personas';
+          break;
+        case 'cross-3d':
+          endpoint = '/api/v1/mirofish/graph/cross';
+          is3D = true;
+          break;
+        default:
+          endpoint = '/api/v1/mirofish/graph/stocks';
+      }
+
+      try {
+        const data = await api('GET', endpoint);
+        if (!data.nodes || !data.nodes.length) {
+          container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:16px;">暂无数据，请先添加标的或 Persona</div>';
+          return;
+        }
+
+        renderStats(data.stats);
+
+        if (is3D) {
+          render3DGraph(container, data);
+        } else {
+          render2DGraph(container, data);
+        }
+      } catch (e) {
+        container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--persona-color);">加载失败: ${e.message}</div>`;
+      }
+    }
+
+    function render2DGraph(container, data) {
+      const nodeMap = {};
+      data.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+      // Filter edges to only include ones where both nodes exist
+      const validEdges = data.edges.filter(e =>
+        nodeMap[e.source_id] && nodeMap[e.target_id]
+      );
+
+      const graphData = {
+        nodes: data.nodes.map(n => ({
+          id: n.id,
+          label: n.label,
+          nodeType: n.node_type,
+          color: n.color || '#888',
+          size: (n.size || 1) * 6,
+          properties: n.properties || {},
+          val: (n.size || 1) * 3,
+        })),
+        links: validEdges.map(e => ({
+          source: e.source_id,
+          target: e.target_id,
+          edgeType: e.edge_type,
+          weight: e.weight || 1,
+        })),
+      };
+
+      graphInstance = ForceGraph()(container)
+        .graphData(graphData)
+        .nodeId('id')
+        .nodeLabel(n => `${n.label} (${n.nodeType})`)
+        .nodeColor(n => n.color)
+        .nodeVal(n => n.val)
+        .nodeCanvasObject((node, ctx, globalScale) => {
+          // Draw node circle
+          const size = node.val;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+          ctx.fillStyle = node.color;
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+
+          // Draw label
+          if (showLabels && globalScale > 0.4) {
+            const fontSize = Math.max(10 / globalScale, 3);
+            ctx.font = `${fontSize}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillText(node.label, node.x, node.y + size + 2);
+          }
+        })
+        .linkColor(() => 'rgba(255,255,255,0.08)')
+        .linkWidth(l => Math.sqrt(l.weight) * 0.5)
+        .linkDirectionalArrowLength(4)
+        .linkDirectionalArrowRelPos(0.9)
+        .backgroundColor('#0a0a1a')
+        .onNodeClick(node => showNodeDetail(node))
+        .cooldownTicks(100)
+        .width(container.clientWidth)
+        .height(container.clientHeight);
+    }
+
+    function render3DGraph(container, data) {
+      const nodeMap = {};
+      data.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+      const validEdges = data.edges.filter(e =>
+        nodeMap[e.source_id] && nodeMap[e.target_id]
+      );
+
+      const graphData = {
+        nodes: data.nodes.map(n => ({
+          id: n.id,
+          label: n.label,
+          nodeType: n.node_type,
+          color: n.color || '#888',
+          size: (n.size || 1) * 4,
+          properties: n.properties || {},
+          dimension: n.dimension,
+          fx: n.x, fy: n.y, fz: n.z,
+        })),
+        links: validEdges.map(e => ({
+          source: e.source_id,
+          target: e.target_id,
+          edgeType: e.edge_type,
+          weight: e.weight || 1,
+        })),
+      };
+
+      graphInstance = ForceGraph3D()(container)
+        .graphData(graphData)
+        .nodeId('id')
+        .nodeLabel(n => `${n.label} (${n.nodeType})`)
+        .nodeColor(n => n.color)
+        .nodeVal(n => n.size)
+        .nodeOpacity(0.9)
+        .nodeThreeObject(node => {
+          const group = new THREE.Group();
+
+          // Sphere
+          const geometry = new THREE.SphereGeometry(node.size, 16, 12);
+          const material = new THREE.MeshLambertMaterial({
+            color: node.color,
+            transparent: true,
+            opacity: 0.85,
+          });
+          const sphere = new THREE.Mesh(geometry, material);
+          group.add(sphere);
+
+          // Glow ring for stocks dimension
+          if (node.dimension === 'stocks') {
+            const ringGeo = new THREE.RingGeometry(node.size * 1.2, node.size * 1.5, 24);
+            const ringMat = new THREE.MeshBasicMaterial({
+              color: node.color,
+              transparent: true,
+              opacity: 0.2,
+              side: THREE.DoubleSide,
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            group.add(ring);
+          }
+
+          return group;
+        })
+        .linkColor(() => 'rgba(255,255,255,0.06)')
+        .linkWidth(l => Math.sqrt(l.weight) * 0.3)
+        .linkOpacity(0.3)
+        .linkDirectionalArrowLength(3)
+        .backgroundColor('#0a0a1a')
+        .onNodeClick(node => showNodeDetail(node))
+        .width(container.clientWidth)
+        .height(container.clientHeight);
+    }
+
+    function renderStats(stats) {
+      const bar = document.getElementById('stats-bar');
+      const colors = {
+        stock: 'var(--stock-color)',
+        tag: 'var(--tag-color)',
+        group: 'var(--group-color)',
+        sector: 'var(--sector-color)',
+        persona: 'var(--persona-color)',
+        strategy: 'var(--strategy-color)',
+        market: 'var(--market-color)',
+      };
+      bar.innerHTML = Object.entries(stats || {}).map(([type, count]) => `
+        <div class="stat-chip">
+          <div class="stat-dot" style="background:${colors[type] || '#888'}"></div>
+          ${type}: ${count}
+        </div>
+      `).join('');
+    }
+
+    // ========================================
+    // Node Detail
+    // ========================================
+    function showNodeDetail(node) {
+      const panel = document.getElementById('detail-panel');
+      const title = document.getElementById('detail-title');
+      const body = document.getElementById('detail-body');
+
+      const typeLabel = {
+        stock: '📈 Stock',
+        persona: '🎭 Persona',
+        tag: '🏷️ Tag',
+        group: '📁 Group',
+        sector: '🏢 Sector',
+        strategy: '🎯 Strategy',
+        market: '🌍 Market',
+      };
+
+      title.innerHTML = `<span style="color:${node.color}">${typeLabel[node.nodeType] || node.nodeType}</span> ${node.label}`;
+
+      let html = '';
+      html += `<div class="detail-row"><span class="label">ID</span><span>${node.id}</span></div>`;
+      html += `<div class="detail-row"><span class="label">Type</span><span>${node.nodeType}</span></div>`;
+
+      if (node.properties) {
+        for (const [k, v] of Object.entries(node.properties)) {
+          if (v && typeof v !== 'object') {
+            html += `<div class="detail-row"><span class="label">${k}</span><span>${v}</span></div>`;
+          }
+        }
+      }
+
+      // Actions
+      html += '<div style="margin-top:16px;display:flex;gap:6px;flex-wrap:wrap">';
+      if (node.nodeType === 'stock') {
+        html += `<button class="btn btn-primary" onclick="analyzeStock('${node.properties?.symbol || node.label}')">分析</button>`;
+        html += `<button class="btn btn-secondary" onclick="loadEgoGraph('${node.id}')">展开图谱</button>`;
+      }
+      if (node.nodeType === 'persona') {
+        html += `<button class="btn btn-secondary" onclick="loadEgoGraph('${node.id}')">展开图谱</button>`;
+      }
+      html += '</div>';
+
+      body.innerHTML = html;
+      panel.classList.add('visible');
+    }
+
+    function closeDetail() {
+      document.getElementById('detail-panel').classList.remove('visible');
+    }
+
+    async function loadEgoGraph(nodeId) {
+      const container = document.getElementById('graph-canvas');
+      container.innerHTML = '';
+      if (graphInstance) {
+        if (graphInstance._destructor) graphInstance._destructor();
+        graphInstance = null;
+      }
+
+      try {
+        const data = await api('GET', `/api/v1/mirofish/graph/ego/${encodeURIComponent(nodeId)}`);
+        renderStats(data.stats);
+        render3DGraph(container, data);
+      } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+      }
+    }
+
+    async function analyzeStock(symbol) {
+      showToast(`Analyzing ${symbol}...`);
+      try {
+        const data = await api('POST', '/api/v1/mirofish/analyze', { stock_codes: [symbol] });
+        showToast(`Analysis submitted: ${JSON.stringify(data.tasks?.[0] || data)}`);
+      } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+      }
+    }
+
+    // ========================================
+    // Controls
+    // ========================================
+    function zoomToFit() {
+      if (graphInstance && graphInstance.zoomToFit) {
+        graphInstance.zoomToFit(500);
+      }
+    }
+
+    function toggleLabels() {
+      showLabels = !showLabels;
+      if (graphInstance && !currentView.includes('3d')) {
+        graphInstance.nodeCanvasObject(graphInstance.nodeCanvasObject());
+      }
+    }
+
+    function refreshGraph() {
+      loadGraph(currentView);
+    }
+
+    // ========================================
+    // Tab Navigation
+    // ========================================
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        loadGraph(tab.dataset.view);
+      });
+    });
+
+    // ========================================
+    // Search
+    // ========================================
+    let searchTimeout;
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(async () => {
+        const q = e.target.value.trim();
+        if (!q) return;
+        try {
+          const data = await api('GET', `/api/v1/mirofish/graph/search?q=${encodeURIComponent(q)}`);
+          if (data.nodes?.length) {
+            showToast(`Found ${data.nodes.length} nodes`);
+            // Highlight first match
+            if (graphInstance && graphInstance.centerAt) {
+              const n = data.nodes[0];
+              if (n.x != null && n.y != null) {
+                graphInstance.centerAt(n.x, n.y, 500);
+              }
+            }
+          }
+        } catch {}
+      }, 500);
+    });
+
+    // ========================================
+    // Add Modal
+    // ========================================
+    function openAddModal() {
+      document.getElementById('add-modal').classList.add('visible');
+      updateAddFields();
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('visible');
+    }
+
+    document.getElementById('add-type').addEventListener('change', updateAddFields);
+
+    function updateAddFields() {
+      const type = document.getElementById('add-type').value;
+      const container = document.getElementById('add-fields');
+      let html = '';
+
+      switch (type) {
+        case 'stock':
+          html = `
+            <div class="form-group"><label>Symbol</label><input class="form-input" id="add-symbol" placeholder="AAPL"></div>
+            <div class="form-group"><label>Name</label><input class="form-input" id="add-name" placeholder="Apple Inc."></div>
+            <div class="form-group"><label>Market</label><select class="form-input" id="add-market"><option>US</option><option>CN</option><option>HK</option></select></div>
+            <div class="form-group"><label>Sector</label><input class="form-input" id="add-sector" placeholder="Technology"></div>
+            <div class="form-group"><label>Tags (comma separated)</label><input class="form-input" id="add-tags" placeholder="tech, mega-cap, growth"></div>
+            <div class="form-group"><label>Group</label><input class="form-input" id="add-group" placeholder="FAANG"></div>
+          `;
+          break;
+        case 'group':
+          html = `
+            <div class="form-group"><label>Group Name</label><input class="form-input" id="add-gname" placeholder="Growth Stocks"></div>
+            <div class="form-group"><label>Parent Group</label><input class="form-input" id="add-gparent" placeholder="(optional)"></div>
+            <div class="form-group"><label>Description</label><input class="form-input" id="add-gdesc" placeholder=""></div>
+          `;
+          break;
+        case 'tag':
+          html = `
+            <div class="form-group"><label>Tag Name</label><input class="form-input" id="add-tname" placeholder="momentum"></div>
+            <div class="form-group"><label>Color</label><input class="form-input" id="add-tcolor" type="color" value="#f39c12"></div>
+          `;
+          break;
+        case 'persona':
+          html = `
+            <div class="form-group"><label>Persona ID</label><input class="form-input" id="add-pid" placeholder="aggressive_trader"></div>
+            <div class="form-group"><label>Name</label><input class="form-input" id="add-pname" placeholder="激进短线手"></div>
+            <div class="form-group"><label>Description</label><textarea class="form-input" id="add-pdesc" rows="2" placeholder="交易风格描述"></textarea></div>
+            <div class="form-group"><label>Strategies (comma separated)</label><input class="form-input" id="add-pstrategies" placeholder="bull_trend, ma_golden_cross"></div>
+          `;
+          break;
+      }
+      container.innerHTML = html;
+    }
+
+    async function submitAdd() {
+      const type = document.getElementById('add-type').value;
+      try {
+        switch (type) {
+          case 'stock': {
+            const tags = document.getElementById('add-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+            await api('POST', '/api/v1/mirofish/stocks', {
+              symbol: document.getElementById('add-symbol').value.trim(),
+              name: document.getElementById('add-name').value.trim(),
+              market: document.getElementById('add-market').value,
+              sector: document.getElementById('add-sector').value.trim(),
+              tags: tags.length ? tags : null,
+              group: document.getElementById('add-group').value.trim(),
+            });
+            break;
+          }
+          case 'group':
+            await api('POST', '/api/v1/mirofish/groups', {
+              name: document.getElementById('add-gname').value.trim(),
+              parent_group: document.getElementById('add-gparent').value.trim(),
+              description: document.getElementById('add-gdesc').value.trim(),
+            });
+            break;
+          case 'tag':
+            await api('POST', '/api/v1/mirofish/tags', {
+              name: document.getElementById('add-tname').value.trim(),
+              color: document.getElementById('add-tcolor').value,
+            });
+            break;
+          case 'persona': {
+            const strategies = document.getElementById('add-pstrategies').value.split(',').map(s => s.trim()).filter(Boolean);
+            await api('POST', '/api/v1/mirofish/personas', {
+              persona_id: document.getElementById('add-pid').value.trim(),
+              name: document.getElementById('add-pname').value.trim(),
+              description: document.getElementById('add-pdesc').value.trim(),
+              strategies: strategies.length ? strategies : null,
+            });
+            break;
+          }
+        }
+        showToast('Added successfully!');
+        closeModal('add-modal');
+        refreshGraph();
+        loadSidebar();
+      } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+      }
+    }
+
+    // ========================================
+    // Image Modal
+    // ========================================
+    function openImageModal() {
+      document.getElementById('image-modal').classList.add('visible');
+    }
+
+    const imgDropZone = document.getElementById('img-drop-zone');
+    const imgFileInput = document.getElementById('img-file-input');
+    const imgPreview = document.getElementById('img-preview');
+
+    imgDropZone.addEventListener('click', () => imgFileInput.click());
+    imgDropZone.addEventListener('dragover', e => { e.preventDefault(); imgDropZone.classList.add('dragover'); });
+    imgDropZone.addEventListener('dragleave', () => imgDropZone.classList.remove('dragover'));
+    imgDropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      imgDropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleImageFile(e.dataTransfer.files[0]);
+    });
+    imgFileInput.addEventListener('change', () => {
+      if (imgFileInput.files.length) handleImageFile(imgFileInput.files[0]);
+    });
+
+    // Clipboard paste
+    document.addEventListener('paste', e => {
+      if (!document.getElementById('image-modal').classList.contains('visible')) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          handleImageFile(item.getAsFile());
+          break;
+        }
+      }
+    });
+
+    function handleImageFile(file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('File too large (max 5MB)', 'error');
+        return;
+      }
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = () => {
+        imgPreview.src = reader.result;
+        imgPreview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function extractFromImage() {
+      if (!selectedFile) {
+        showToast('No image selected', 'error');
+        return;
+      }
+      showToast('Extracting stocks from image...');
+      try {
+        const data = await apiUpload('/api/v1/stocks/extract-from-image?include_raw=false', selectedFile);
+        if (data.items) {
+          recognizedStocks = data.items;
+          renderRecognizedStocks();
+        }
+      } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+      }
+    }
+
+    async function parseText() {
+      const text = document.getElementById('img-text-input').value.trim();
+      if (!text) {
+        showToast('No text to parse', 'error');
+        return;
+      }
+      showToast('Parsing text...');
+      try {
+        const data = await api('POST', '/api/v1/stocks/parse-import', { text });
+        if (data.items) {
+          recognizedStocks = data.items;
+          renderRecognizedStocks();
+        }
+      } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+      }
+    }
+
+    function renderRecognizedStocks() {
+      const container = document.getElementById('img-results');
+      const list = document.getElementById('img-results-list');
+      container.style.display = 'block';
+      list.innerHTML = recognizedStocks.map((s, i) => `
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span class="card-badge" style="background:${s.confidence === 'high' ? 'rgba(46,204,113,0.2);color:#2ecc71' : s.confidence === 'medium' ? 'rgba(241,196,15,0.2);color:#f1c40f' : 'rgba(233,69,96,0.2);color:#e94560'}">${s.confidence}</span>
+            <strong>${s.code || '?'}</strong>
+            ${s.name ? `<span style="color:var(--text-secondary);margin-left:4px">${s.name}</span>` : ''}
+          </div>
+          <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="recognizedStocks.splice(${i},1);renderRecognizedStocks()">×</button>
+        </div>
+      `).join('');
+      showToast(`Recognized ${recognizedStocks.length} stocks`);
+    }
+
+    async function addRecognizedStocks() {
+      if (!recognizedStocks.length) {
+        showToast('No stocks to add', 'error');
+        return;
+      }
+      const stocks = recognizedStocks
+        .filter(s => s.code)
+        .map(s => ({ symbol: s.code, name: s.name || s.code, market: 'US' }));
+
+      try {
+        await api('POST', '/api/v1/mirofish/stocks/batch', { stocks });
+        showToast(`Added ${stocks.length} stocks to graph`);
+        closeModal('image-modal');
+        recognizedStocks = [];
+        refreshGraph();
+        loadSidebar();
+      } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+      }
+    }
+
+    // ========================================
+    // Sidebar
+    // ========================================
+    async function loadSidebar() {
+      try {
+        // Load hierarchy
+        const hierarchy = await api('GET', '/api/v1/mirofish/stocks/hierarchy');
+        const groupsEl = document.getElementById('groups-list');
+        if (hierarchy.groups?.length) {
+          groupsEl.innerHTML = hierarchy.groups.map(g => renderGroupCard(g)).join('');
+        } else {
+          groupsEl.innerHTML = '<div style="color:var(--text-secondary);font-size:12px;padding:4px">无群组</div>';
+        }
+
+        const tagsEl = document.getElementById('tags-list');
+        if (hierarchy.tags?.length) {
+          tagsEl.innerHTML = '<div class="tag-chips">' +
+            hierarchy.tags.map(t => `<span class="tag-chip" onclick="filterByTag('${t.label}')">${t.label}</span>`).join('') +
+            '</div>';
+        } else {
+          tagsEl.innerHTML = '<div style="color:var(--text-secondary);font-size:12px;padding:4px">无标签</div>';
+        }
+
+        // Load personas
+        const personasData = await api('GET', '/api/v1/mirofish/personas');
+        const personasEl = document.getElementById('personas-list');
+        if (personasData.personas?.length) {
+          personasEl.innerHTML = personasData.personas.map(p => `
+            <div class="card" onclick="loadEgoGraph('${p.id}')">
+              <div class="card-title" style="color:var(--persona-color)">${p.label}</div>
+              <div class="card-desc">${p.properties?.description || ''}</div>
+            </div>
+          `).join('');
+        } else {
+          personasEl.innerHTML = '<div style="color:var(--text-secondary);font-size:12px;padding:4px">无 Persona</div>';
+        }
+      } catch (e) {
+        console.error('Failed to load sidebar:', e);
+      }
+    }
+
+    function renderGroupCard(group) {
+      const stocks = (group.stocks || []).slice(0, 5);
+      const children = group.children || [];
+      return `
+        <div class="card" onclick="loadEgoGraph('${group.id}')">
+          <div class="card-title" style="color:var(--group-color)">${group.label}</div>
+          ${stocks.length ? `<div class="card-desc">${stocks.map(s => s.label).join(', ')}${group.stocks?.length > 5 ? '...' : ''}</div>` : ''}
+        </div>
+        ${children.map(c => `<div style="margin-left:12px">${renderGroupCard(c)}</div>`).join('')}
+      `;
+    }
+
+    function filterByTag(tagName) {
+      showToast(`Filtering by tag: ${tagName}`);
+      const tagNodeId = 'tag:' + tagName;
+      loadEgoGraph(tagNodeId);
+    }
+
+    // ========================================
+    // Window Resize
+    // ========================================
+    window.addEventListener('resize', () => {
+      if (graphInstance) {
+        const container = document.getElementById('graph-canvas');
+        graphInstance.width(container.clientWidth);
+        graphInstance.height(container.clientHeight);
+      }
+    });
+
+    // ========================================
+    // Init
+    // ========================================
+    loadGraph('stocks-2d');
+    loadSidebar();
+  </script>
+</body>
+</html>

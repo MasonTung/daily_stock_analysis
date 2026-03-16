@@ -156,6 +156,19 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
             """根路由 - 前端未构建时返回引导页面"""
             return HTMLResponse(content=_FRONTEND_NOT_BUILT_HTML)
     
+    # ============================================================
+    # 薯条交易 (Fries Trading) 页面
+    # ============================================================
+
+    _MIROFISH_TEMPLATE = Path(__file__).parent.parent / "mirofish" / "templates" / "fries_trading.html"
+
+    @app.get("/fries", include_in_schema=False)
+    async def fries_trading_page():
+        """薯条交易 - 图谱可视化页面"""
+        if _MIROFISH_TEMPLATE.exists():
+            return FileResponse(_MIROFISH_TEMPLATE, media_type="text/html")
+        return HTMLResponse("<h1>Fries Trading template not found</h1>", status_code=404)
+
     @app.get(
         "/api/health",
         response_model=HealthResponse,
