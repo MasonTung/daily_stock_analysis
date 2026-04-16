@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大宗商品量化助手 - Commodity Trading Assistant</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+  <!-- 顶部标题栏 -->
+  <header class="topbar">
+    <div class="logo">
+      <h1>🛢️ 大宗商品量化助手</h1>
+      <span class="subtitle">黄金 · 白银 · 原油 · 分钟级 · 防过拟合</span>
+    </div>
+    <div class="controls">
+      <select id="interval-select">
+        <option value="5m" selected>5分钟</option>
+        <option value="15m">15分钟</option>
+        <option value="30m">30分钟</option>
+        <option value="60m">60分钟</option>
+      </select>
+      <select id="lookback-select">
+        <option value="30">30天</option>
+        <option value="59" selected>59天(2月)</option>
+      </select>
+      <button id="analyze-btn" class="primary">▶ 开始分析</button>
+      <div id="status-indicator" class="status idle">
+        <span class="dot"></span>
+        <span id="status-text">未开始</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 提示 -->
+  <div id="welcome-banner" class="banner">
+    <p>👋 点击 <b>"开始分析"</b> 按钮启动完整流程（约 7-10 秒）：数据获取 → 地缘风险评估 → 未来函数验证 → Walk-Forward 回测 → 策略推荐</p>
+  </div>
+
+  <!-- 主内容区 -->
+  <main id="dashboard" class="dashboard hidden">
+
+    <!-- 第一行: 地缘政治 + 市场快照 -->
+    <section class="row row-2col">
+      <div class="card">
+        <h2>🌍 地缘政治风险评估</h2>
+        <div id="geo-panel" class="geo-panel">
+          <div class="geo-score">
+            <div class="score-gauge" id="geo-gauge"></div>
+            <div class="score-label">
+              <span class="score-number" id="geo-score-number">-</span>
+              <span class="score-level" id="geo-score-level">-</span>
+            </div>
+          </div>
+          <div class="geo-details">
+            <h3>品种偏好</h3>
+            <div id="geo-bias"></div>
+            <h3>仓位缩放</h3>
+            <div id="geo-position"></div>
+            <h3>活跃风险因子</h3>
+            <ul id="geo-factors"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📊 当前市场快照</h2>
+        <div id="snapshot-grid" class="snapshot-grid"></div>
+      </div>
+    </section>
+
+    <!-- 第二行: K线图 (Tab 切换商品) -->
+    <section class="row">
+      <div class="card">
+        <div class="card-header">
+          <h2>📈 K线图 + 技术指标</h2>
+          <div class="tabs" id="commodity-tabs">
+            <button data-commodity="gold" class="tab active">黄金 (XAU)</button>
+            <button data-commodity="silver" class="tab">白银 (XAG)</button>
+            <button data-commodity="oil" class="tab">原油 (WTI)</button>
+          </div>
+        </div>
+        <div id="kline-chart" class="chart-large"></div>
+      </div>
+    </section>
+
+    <!-- 第三行: 策略绩效矩阵 -->
+    <section class="row">
+      <div class="card">
+        <h2>🎯 策略绩效矩阵 (Walk-Forward 样本外)</h2>
+        <div class="info-bar">
+          <span>💡 只显示 <b>样本外</b> 测试结果。OOS 一致性 ≥ 50% + 交易次数 ≥ 10 + -1 &lt; Sharpe &lt; 5 才通过过拟合检测。</span>
+        </div>
+        <div id="backtest-matrix"></div>
+      </div>
+    </section>
+
+    <!-- 第四行: 最优策略推荐 -->
+    <section class="row">
+      <div class="card">
+        <h2>⭐ 最优策略推荐</h2>
+        <div id="recommendations" class="recommendations"></div>
+      </div>
+    </section>
+
+    <!-- 第五行: 策略详情 (Walk-Forward 分窗口 + 交易流水) -->
+    <section class="row">
+      <div class="card">
+        <div class="card-header">
+          <h2>🔬 策略详情</h2>
+          <div class="selector">
+            <select id="detail-commodity-select">
+              <option value="gold">黄金</option>
+              <option value="silver">白银</option>
+              <option value="oil">原油</option>
+            </select>
+            <select id="detail-strategy-select"></select>
+          </div>
+        </div>
+        <div class="row row-2col">
+          <div>
+            <h3>Walk-Forward 分窗口表现</h3>
+            <div id="wf-chart" class="chart-medium"></div>
+          </div>
+          <div>
+            <h3>最近交易流水</h3>
+            <div id="trade-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>⚠️ <b>风险提示</b>：历史回测不代表未来收益。本系统使用 Walk-Forward 分析防止过拟合，但实盘仍需考虑流动性、极端行情、滑点等额外风险。</p>
+      <p>📦 <code>commodity_assistant/web</code> · Python 3.11 · FastAPI · ECharts</p>
+    </footer>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
